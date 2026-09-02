@@ -1,0 +1,1934 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>角色配队 JSON 编辑器</title>
+<style>
+  :root{
+    --bg:#0f1115;
+    --panel:#171a21;
+    --panel2:#20242d;
+    --line:#303746;
+    --text:#eef2f7;
+    --muted:#98a2b3;
+    --accent:#7aa2f7;
+    --danger:#ff6b6b;
+    --ok:#4fd1a5;
+    --yellow:#f3c84b;
+    --white:#f4f7fb;
+    --empty:#2b313c;
+  }
+  *{box-sizing:border-box}
+  body{
+    margin:0;
+    font-family:Inter,"Microsoft YaHei",system-ui,sans-serif;
+    background:var(--bg);
+    color:var(--text);
+  }
+  .app{
+    display:grid;
+    grid-template-columns:400px 1fr;
+    min-height:100vh;
+  }
+  .sidebar{
+    border-right:1px solid var(--line);
+    background:#12151b;
+    padding:18px;
+    display:flex;
+    flex-direction:column;
+    gap:14px;
+  }
+  .title{font-size:20px;font-weight:700}
+  .subtitle{font-size:12px;color:var(--muted);line-height:1.6}
+  .toolbar{display:flex;gap:8px;flex-wrap:wrap}
+  button,.file-label{
+    border:1px solid var(--line);
+    background:var(--panel2);
+    color:var(--text);
+    padding:9px 12px;
+    border-radius:9px;
+    cursor:pointer;
+    font-size:13px;
+  }
+  button:hover,.file-label:hover{border-color:#566174}
+  button.primary{background:#2f5fd0;border-color:#4777e9}
+  button.danger{background:#4a2227;border-color:#7a343c}
+  button.ghost{background:transparent}
+  input[type=file]{display:none}
+  .search{
+    width:100%;
+    background:var(--panel);
+    border:1px solid var(--line);
+    color:var(--text);
+    border-radius:9px;
+    padding:10px 12px;
+    outline:none;
+  }
+  .list{
+    overflow-y:auto;
+    overflow-x:hidden;
+    display:grid;
+    grid-template-columns:repeat(2, minmax(0, 1fr));
+    align-content:start;
+    gap:7px;
+    min-height:0;
+    flex:1;
+    padding-right:4px;
+  }
+  .char-item{
+    padding:9px 10px;
+    min-width:0;
+    border:1px solid var(--line);
+    border-radius:10px;
+    background:var(--panel);
+    cursor:pointer;
+    display:flex;
+    justify-content:space-between;
+    gap:10px;
+    align-items:center;
+  }
+  .char-item.active{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent) inset}
+  .char-name{font-weight:650;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .badge{
+    font-size:11px;
+    padding:3px 7px;
+    border-radius:999px;
+    background:#27313e;
+    color:#cbd5e1;
+  }
+  .badge.off{background:#3a2529;color:#ffaaaa}
+  .main{
+    padding:24px;
+    overflow:auto;
+  }
+  .empty-state{
+    max-width:760px;
+    margin:80px auto;
+    border:1px dashed var(--line);
+    border-radius:14px;
+    padding:42px;
+    text-align:center;
+    color:var(--muted);
+  }
+  .editor{
+    width:100%;
+    max-width:1600px;
+    margin:0 auto;
+  }
+  .header{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    gap:18px;
+    margin-bottom:18px;
+  }
+  .header h1{margin:0;font-size:24px}
+  .grid{
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:18px;
+  }
+  .card{
+    background:var(--panel);
+    border:1px solid var(--line);
+    border-radius:14px;
+    padding:18px;
+  }
+  .card h3{margin:0 0 14px;font-size:16px}
+  .field{display:flex;flex-direction:column;gap:7px;margin-bottom:14px}
+  .field:last-child{margin-bottom:0}
+  label{font-size:13px;color:#d7deea}
+  input[type=text],input[type=number],textarea{
+    width:100%;
+    background:#11151b;
+    border:1px solid var(--line);
+    border-radius:8px;
+    color:var(--text);
+    padding:10px 11px;
+    outline:none;
+  }
+  input:focus,textarea:focus{border-color:var(--accent)}
+  .switchrow{
+    display:flex;
+    align-items:center;
+    gap:10px;
+    min-height:40px;
+  }
+  .stats{
+    display:grid;
+    grid-template-columns:repeat(2,1fr);
+    gap:12px;
+  }
+  .tags{
+    display:grid;
+    grid-template-columns:repeat(2,1fr);
+    gap:12px;
+  }
+  .pattern-wrap{
+    display:flex;
+    gap:22px;
+    align-items:flex-start;
+    flex-wrap:wrap;
+  }
+  .pattern{
+    display:grid;
+    grid-template-columns:repeat(3,74px);
+    grid-template-rows:repeat(3,74px);
+    gap:7px;
+  }
+  .cell{
+    width:74px;height:74px;
+    border-radius:10px;
+    border:1px solid var(--line);
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    font-size:12px;
+    font-weight:700;
+    cursor:pointer;
+    user-select:none;
+  }
+  .cell.v0{background:var(--empty);color:#6f7a8a}
+  .cell.v1{background:var(--yellow);color:#2d2817}
+  .cell.v2{background:var(--white);color:#222}
+  .legend{
+    display:flex;
+    flex-direction:column;
+    gap:8px;
+    font-size:13px;
+    color:var(--muted);
+  }
+  .legend span{display:flex;align-items:center;gap:8px}
+  .dot{width:15px;height:15px;border-radius:4px;border:1px solid #555}
+  .dot.empty{background:var(--empty)}
+  .dot.buff{background:var(--yellow)}
+  .dot.self{background:var(--white)}
+  .json-preview{
+    background:#0d1015;
+    border:1px solid var(--line);
+    border-radius:10px;
+    padding:14px;
+    overflow:auto;
+    white-space:pre;
+    font-family:Consolas,monospace;
+    font-size:12px;
+    max-height:340px;
+  }
+  .footer-actions{
+    display:flex;
+    justify-content:flex-end;
+    gap:10px;
+    margin-top:18px;
+  }
+  .notice{
+    font-size:12px;
+    color:var(--muted);
+    line-height:1.6;
+  }
+  @media(max-width:900px){
+    .app{grid-template-columns:1fr}
+    .sidebar{border-right:0;border-bottom:1px solid var(--line);max-height:42vh}
+    .grid{grid-template-columns:1fr}
+  }
+
+  .simulator{
+    margin-top:24px;
+    background:var(--panel);
+    border:1px solid var(--line);
+    border-radius:14px;
+    padding:20px;
+  }
+  .simulator h2{margin:0 0 6px;font-size:20px}
+  .sim-desc{font-size:12px;color:var(--muted);line-height:1.7;margin-bottom:16px}
+  .sim-layout{
+    display:grid;
+    grid-template-columns:minmax(400px,1.25fr) minmax(320px,.95fr) minmax(360px,1.05fr);
+    gap:16px;
+    align-items:start;
+  }
+  .sim-box{
+    background:#12161d;
+    border:1px solid var(--line);
+    border-radius:12px;
+    padding:15px;
+  }
+  .sim-box h3{margin:0 0 12px;font-size:15px}
+  .threshold-grid{
+    display:grid;
+    grid-template-columns:1fr;
+    gap:10px;
+  }
+  .sim-textarea{
+    min-height:170px;
+    resize:vertical;
+    font-family:Consolas,monospace;
+    font-size:12px;
+    line-height:1.6;
+  }
+  .sim-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
+  .sim-summary{
+    display:grid;
+    grid-template-columns:repeat(2,1fr);
+    gap:8px;
+    margin-bottom:12px;
+  }
+  .metric{
+    border:1px solid var(--line);
+    border-radius:9px;
+    background:#0e1218;
+    padding:9px 10px;
+  }
+  .metric .k{font-size:11px;color:var(--muted)}
+  .metric .v{font-size:18px;font-weight:700;margin-top:3px}
+  .team-list{display:flex;flex-direction:column;gap:7px}
+  .team-row{
+    display:grid;
+    grid-template-columns:26px 1fr auto;
+    gap:8px;
+    align-items:center;
+    border:1px solid var(--line);
+    background:#0e1218;
+    border-radius:9px;
+    padding:8px 9px;
+  }
+  .team-rank{
+    width:24px;height:24px;border-radius:50%;
+    display:flex;align-items:center;justify-content:center;
+    background:#27313e;font-size:11px;font-weight:700;
+  }
+  .team-name{font-weight:650}
+  .team-stats{font-size:11px;color:var(--muted);margin-top:2px}
+  .tag-chip{
+    display:inline-block;
+    margin:3px 4px 0 0;
+    padding:3px 7px;
+    border-radius:999px;
+    background:#202a38;
+    font-size:11px;
+    color:#d8e1ee;
+  }
+  .best-tag{border-color:#7aa2f7;background:#20345d}
+  .formation{
+    display:grid;
+    grid-template-columns:repeat(3,1fr);
+    gap:8px;
+    aspect-ratio:1/1;
+    max-width:420px;
+    margin:0 auto;
+  }
+  .formation-cell{
+    position:relative;
+    min-width:0;
+    border:1px solid var(--line);
+    background:#0d1117;
+    border-radius:11px;
+    padding:7px;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    text-align:center;
+    overflow:hidden;
+  }
+  .formation-cell.occupied{
+    border-color:#5f76a8;
+    background:#172235;
+  }
+  .formation-cell.buff-hit{
+    box-shadow:inset 0 0 0 2px rgba(243,200,75,.35);
+  }
+  .formation-cell.top-dps{
+    border-color:#f3c84b;
+    box-shadow:inset 0 0 0 2px rgba(243,200,75,.45);
+  }
+  .formation-name{
+    font-size:12px;
+    font-weight:700;
+    line-height:1.25;
+    word-break:break-all;
+  }
+  .formation-mini{
+    position:absolute;
+    bottom:4px;
+    right:5px;
+    font-size:9px;
+    color:var(--muted);
+  }
+  .buff-count{
+    position:absolute;
+    top:4px;
+    right:5px;
+    font-size:10px;
+    padding:2px 5px;
+    border-radius:999px;
+    background:#594d1f;
+    color:#ffe58d;
+  }
+  .sim-log{
+    margin-top:12px;
+    border:1px solid var(--line);
+    border-radius:9px;
+    background:#0d1015;
+    padding:10px;
+    max-height:170px;
+    overflow:auto;
+    font-size:11px;
+    color:#b8c1cf;
+    line-height:1.6;
+    white-space:pre-wrap;
+  }
+  .score-line{
+    margin-top:10px;
+    font-size:12px;
+    color:var(--muted);
+  }
+  @media(max-width:1250px){
+    .sim-layout{grid-template-columns:minmax(400px,1.15fr) minmax(320px,1fr)}
+    .sim-layout .sim-box:last-child{grid-column:1/-1}
+  }
+  @media(max-width:900px){
+    .sim-layout{grid-template-columns:1fr}
+    .sim-layout .sim-box:last-child{grid-column:auto}
+    .threshold-card{grid-template-columns:minmax(0,1fr) 105px 88px}
+  }
+  @media(max-width:560px){
+    .threshold-card{grid-template-columns:1fr}
+    .random-grid{grid-template-columns:1fr}
+  }
+
+
+  .mode-select{
+    width:100%;
+    background:#11151b;
+    border:1px solid var(--line);
+    border-radius:8px;
+    color:var(--text);
+    padding:9px 10px;
+    outline:none;
+  }
+  .threshold-card{
+    display:grid;
+    grid-template-columns:minmax(0,1fr) 112px 92px;
+    gap:10px;
+    align-items:end;
+  }
+  .threshold-card .field{margin-bottom:0}
+  .random-box{
+    margin-top:12px;
+    padding:12px;
+    border:1px dashed var(--line);
+    border-radius:10px;
+    background:#0e1218;
+  }
+  .random-grid{
+    display:grid;
+    grid-template-columns:repeat(2,minmax(0,1fr));
+    gap:10px;
+  }
+  .checkline{
+    display:flex;
+    align-items:center;
+    gap:8px;
+    min-height:39px;
+    font-size:13px;
+  }
+  .metric .sub{
+    margin-top:2px;
+    font-size:11px;
+    color:var(--muted);
+  }
+
+
+  .threshold-card input,
+  .threshold-card select,
+  .random-grid input{
+    min-width:0;
+    width:100%;
+  }
+  .threshold-card label{
+    white-space:nowrap;
+  }
+  .sim-box{
+    min-width:0;
+  }
+
+</style>
+</head>
+<body>
+<div class="app">
+  <aside class="sidebar">
+    <div>
+      <div class="title">角色 JSON 编辑器</div>
+      <div class="subtitle">增删改查、九宫格 Buff 配置、导入 / 导出 JSON。数据默认保存在浏览器 localStorage。</div>
+    </div>
+
+    <div class="toolbar">
+      <button class="primary" id="addBtn">+ 新建角色</button>
+      <label class="file-label" for="importFile">导入 JSON</label>
+      <input id="importFile" type="file" accept=".json,application/json" />
+      <button id="exportBtn">导出 JSON</button>
+    </div>
+
+    <input class="search" id="searchInput" placeholder="搜索角色名…" />
+
+    <div class="list" id="charList"></div>
+
+    <div class="toolbar">
+      <button class="ghost" id="exportOneBtn">导出当前角色</button>
+      <button id="restoreDefaultBtn">恢复默认 JSON</button>
+        <button class="danger" id="clearBtn">清空全部</button>
+    </div>
+  </aside>
+
+  <main class="main">
+    <div class="empty-state" id="emptyState">
+      还没有角色。点击左侧“新建角色”，或者导入一个 JSON 文件。
+    </div>
+
+    <div class="editor" id="editor" hidden>
+      <div class="header">
+        <div>
+          <h1 id="editorTitle">角色</h1>
+          <div class="notice">修改会自动保存。九宫格点击循环：空白 → Buff → 自身 → 空白。</div>
+        </div>
+        <button class="danger" id="deleteBtn">删除角色</button>
+      </div>
+
+      <div class="grid">
+        <section class="card">
+          <h3>基础信息</h3>
+          <div class="field">
+            <label>角色名称 name</label>
+            <input id="nameInput" type="text" placeholder="例如：洛贝拉" />
+          </div>
+          <div class="field">
+            <label>是否启用 isEnable</label>
+            <div class="switchrow">
+              <input id="enableInput" type="checkbox" />
+              <span id="enableText">启用</span>
+            </div>
+          </div>
+        </section>
+
+        <section class="card">
+          <h3>核心评分</h3>
+          <div class="stats">
+            <div class="field">
+              <label>输出 dps</label>
+              <input id="dpsInput" type="number" min="0" max="100" step="1" />
+            </div>
+            <div class="field">
+              <label>生存 / 治疗 heal</label>
+              <input id="healInput" type="number" min="0" max="100" step="1" />
+            </div>
+            <div class="field">
+              <label>增益 buff</label>
+              <input id="buffInput" type="number" min="0" max="100" step="1" />
+            </div>
+            <div class="field">
+              <label>回能 np</label>
+              <input id="npInput" type="number" min="0" max="100" step="1" />
+            </div>
+          </div>
+        </section>
+
+        <section class="card">
+          <h3>Buff 辐射范围 buffPattern</h3>
+          <div class="pattern-wrap">
+            <div class="pattern" id="patternGrid"></div>
+            <div class="legend">
+              <span><i class="dot empty"></i>0：无效果</span>
+              <span><i class="dot buff"></i>1：Buff 辐射范围</span>
+              <span><i class="dot self"></i>2：角色自身占用格</span>
+              <div class="notice" style="max-width:260px;margin-top:8px">
+                可以放多个“2”，因此两格、三格角色都能表达。当前数据仍保持 3×3 数组格式。
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section class="card">
+          <h3>适用标签 tag</h3>
+          <div class="tags">
+            <div class="field">
+              <label>群体 aoe</label>
+              <input id="aoeInput" type="number" min="0" max="100" step="1" />
+            </div>
+            <div class="field">
+              <label>额外 extra</label>
+              <input id="extraInput" type="number" min="0" max="100" step="1" />
+            </div>
+            <div class="field">
+              <label>持续 dot</label>
+              <input id="dotInput" type="number" min="0" max="100" step="1" />
+            </div>
+            <div class="field">
+              <label>反击 ret</label>
+              <input id="retInput" type="number" min="0" max="100" step="1" />
+            </div>
+          </div>
+        </section>
+
+        <section class="card" style="grid-column:1/-1">
+          <h3>当前角色 JSON 预览</h3>
+          <div class="json-preview" id="jsonPreview"></div>
+        </section>
+      </div>
+
+      <div class="footer-actions">
+        <button id="duplicateBtn">复制当前角色</button>
+        <button class="primary" id="saveBtn">保存当前角色</button>
+      </div>
+
+      <section class="simulator">
+        <h2>自动配队模拟器</h2>
+        <div class="sim-desc">
+          配队分成三步：先对所有候选数组逐组各选 1 名代表；数组里若存在 DPS=100 的可选角色则硬优先。随后从全部预选角色中选固定 5 人，DPS=100 会优先锁定，再根据阈值与队伍缺口补强，最后才计算九宫格最优摆位；
+          选完后累加 tag，并穷举九宫格摆位，优先让高 DPS 角色吃到更多队友 Buff。
+        </div>
+
+        <div class="sim-layout">
+          <div class="sim-box">
+            <h3>① 候选角色与阈值</h3>
+            <div class="field">
+              <label>候选数组（支持多个数组，会自动合并去重）</label>
+              <textarea id="candidateInput" class="sim-textarea" placeholder='[
+  ["洛贝拉", "角色A", "角色B"],
+  ["角色C", "角色D"]
+]'></textarea>
+            </div>
+
+            <div class="threshold-grid">
+              <div class="threshold-card">
+                <div class="field">
+                  <label>DPS 阈值</label>
+                  <input id="simDps" type="number" min="0" max="900" step="1" value="100">
+                </div>
+                <div class="field">
+                  <label>计算方式</label>
+                  <select id="modeDps" class="mode-select">
+                    <option value="avg">平均</option>
+                    <option value="sum" selected>累加</option>
+                  </select>
+                </div>
+                <div class="field">
+                  <label>优先级</label>
+                  <input id="priorityDps" type="number" min="1" max="4" step="1" value="1">
+                </div>
+              </div>
+
+              <div class="threshold-card">
+                <div class="field">
+                  <label>Heal 阈值</label>
+                  <input id="simHeal" type="number" min="0" max="900" step="1" value="80">
+                </div>
+                <div class="field">
+                  <label>计算方式</label>
+                  <select id="modeHeal" class="mode-select">
+                    <option value="avg">平均</option>
+                    <option value="sum" selected>累加</option>
+                  </select>
+                </div>
+                <div class="field">
+                  <label>优先级</label>
+                  <input id="priorityHeal" type="number" min="1" max="4" step="1" value="3">
+                </div>
+              </div>
+
+              <div class="threshold-card">
+                <div class="field">
+                  <label>Buff 阈值</label>
+                  <input id="simBuff" type="number" min="0" max="900" step="1" value="60">
+                </div>
+                <div class="field">
+                  <label>计算方式</label>
+                  <select id="modeBuff" class="mode-select">
+                    <option value="avg">平均</option>
+                    <option value="sum" selected>累加</option>
+                  </select>
+                </div>
+                <div class="field">
+                  <label>优先级</label>
+                  <input id="priorityBuff" type="number" min="1" max="4" step="1" value="4">
+                </div>
+              </div>
+
+              <div class="threshold-card">
+                <div class="field">
+                  <label>NP 阈值</label>
+                  <input id="simNp" type="number" min="0" max="900" step="1" value="80">
+                </div>
+                <div class="field">
+                  <label>计算方式</label>
+                  <select id="modeNp" class="mode-select">
+                    <option value="avg">平均</option>
+                    <option value="sum" selected>累加</option>
+                  </select>
+                </div>
+                <div class="field">
+                  <label>优先级</label>
+                  <input id="priorityNp" type="number" min="1" max="4" step="1" value="2">
+                </div>
+              </div>
+
+              <div class="field">
+                <label>最终队伍人数</label>
+                <input id="simTeamSize" type="number" value="5" readonly>
+              </div>
+            </div>
+
+            <div class="random-box">
+              <div style="font-weight:650;margin-bottom:9px">随机生成候选数组</div>
+              <div class="random-grid">
+                <div class="field">
+                  <label>需要几个数组</label>
+                  <input id="randomGroupCount" type="number" min="1" max="50" step="1" value="8">
+                </div>
+                <div class="field">
+                  <label>每个数组角色数</label>
+                  <input id="randomGroupSize" type="number" min="1" max="50" step="1" value="3">
+                </div>
+                <label class="checkline">
+                  <input id="randomIncludeDisabled" type="checkbox" checked>
+                  随机候选允许禁用角色
+                </label>
+                <label class="checkline">
+                  <input id="teamIncludeDisabled" type="checkbox">
+                  最终配队允许禁用角色
+                </label>
+              </div>
+              <div class="sim-actions">
+                <button id="randomCandidatesBtn">随机生成数组</button>
+              </div>
+            </div>
+
+            <div class="sim-actions">
+              <button class="primary" id="runSimBtn">开始模拟配队</button>
+              <button id="fillEnabledBtn">填入全部启用角色</button>
+            </div>
+            <div class="notice" style="margin-top:10px">
+              每项阈值可独立选择“平均”或“累加”，默认累加。DPS=100 属于硬优先；DPS≥85 视为高质量主C，在当前预选池高DPS不足2人时会优先选。最终5人也尽量保证至少2个 DPS≥80；如果外面还有 DPS≥85，会优先替换掉低DPS位置，而不是只看DPS累加阈值是否已经达标。
+              候选数组按顺序逐组处理，每组先预选 1 人；正常规则无人可选时不会跳过，而会从该组实际存在的角色中选择综合评分最高者作为兜底。候选角色全局不可重复。
+            </div>
+          </div>
+
+          <div class="sim-box">
+            <h3>② 选人结果</h3>
+            <div class="sim-summary">
+              <div class="metric">
+                <div class="k">DPS</div><div class="v" id="avgDps">-</div>
+                <div class="sub">累加：<span id="sumDps">-</span></div>
+              </div>
+              <div class="metric">
+                <div class="k">Heal</div><div class="v" id="avgHeal">-</div>
+                <div class="sub">累加：<span id="sumHeal">-</span></div>
+              </div>
+              <div class="metric">
+                <div class="k">Buff</div><div class="v" id="avgBuff">-</div>
+                <div class="sub">累加：<span id="sumBuff">-</span></div>
+              </div>
+              <div class="metric">
+                <div class="k">NP</div><div class="v" id="avgNp">-</div>
+                <div class="sub">累加：<span id="sumNp">-</span></div>
+              </div>
+            </div>
+            <h3 style="margin-top:14px">数组预选结果</h3>
+            <div id="preliminaryList" class="team-list">
+              <div class="notice">每个数组会先选出 1 名代表角色。</div>
+            </div>
+
+            <h3 style="margin-top:16px">最终 5 人</h3>
+            <div id="teamList" class="team-list">
+              <div class="notice">从全部预选角色中再选出最终 5 人。</div>
+            </div>
+
+            <h3 style="margin-top:16px">Tag 累加</h3>
+            <div id="tagResult" class="notice">暂无结果</div>
+            <div id="simLog" class="sim-log">等待运行…</div>
+          </div>
+
+          <div class="sim-box">
+            <h3>③ 九宫格最优摆位</h3>
+            <div id="formationGrid" class="formation"></div>
+            <div class="score-line" id="formationScore">尚未计算。</div>
+            <div class="notice" style="margin-top:10px">
+              金色边框 = 队伍最高 DPS；右上角数字 = 该角色实际吃到的 Buff 来源数。
+              多格角色按 buffPattern 中所有值为 2 的格子作为占用范围。
+            </div>
+          </div>
+        </div>
+      </section>
+
+    </div>
+  </main>
+</div>
+
+<script>
+const STORAGE_KEY = "maa_character_editor_v1";
+
+// ==================== 默认角色 JSON ====================
+// 以后要换默认数据，只需要替换 DEFAULT_CHARACTERS 这一整个数组。
+// 注意：浏览器已有 localStorage 数据时仍优先读取本地数据。
+const DEFAULT_CHARACTERS = [{"name":"拉","isEnable":true,"buffPattern":[[1,2,0],[1,2,1],[1,1,0]],"dps":0,"heal":85,"buff":0,"np":60,"tag":{"aoe":0,"extra":0,"dot":0,"ret":0}},{"name":"灼碧","isEnable":true,"buffPattern":[[1,2,0],[1,1,1],[1,1,0]],"dps":60,"heal":80,"buff":80,"np":0,"tag":{"aoe":0,"extra":0,"dot":0,"ret":0}},{"name":"龙弦","isEnable":true,"buffPattern":[[0,1,1],[1,1,2],[0,1,1]],"dps":40,"heal":0,"buff":0,"np":0,"tag":{"aoe":0,"extra":0,"dot":0,"ret":0}},{"name":"熔铄","isEnable":true,"buffPattern":[[0,1,1],[2,1,1],[0,1,1]],"dps":40,"heal":0,"buff":40,"np":0,"tag":{"aoe":0,"extra":0,"dot":0,"ret":0}},{"name":"芭贝拉·红","isEnable":false,"buffPattern":[[1,0,0],[1,1,1],[2,1,1]],"dps":0,"heal":0,"buff":0,"np":0,"tag":{"aoe":0,"extra":0,"dot":0,"ret":0}},{"name":"提泽纳","isEnable":false,"buffPattern":[[1,1,0],[1,1,2],[1,1,0]],"dps":40,"heal":0,"buff":30,"np":0,"tag":{"aoe":0,"extra":0,"dot":0,"ret":0}},{"name":"昆仑·不朽","isEnable":true,"buffPattern":[[0,1,1],[1,2,1],[0,1,1]],"dps":95,"heal":10,"buff":0,"np":0,"tag":{"aoe":0,"extra":0,"dot":0,"ret":80}},{"name":"阿图姆","isEnable":false,"buffPattern":[[1,0,0],[1,2,1],[1,1,1]],"dps":40,"heal":0,"buff":0,"np":0,"tag":{"aoe":0,"extra":0,"dot":0,"ret":0}},{"name":"莫拉鲁塔","isEnable":false,"buffPattern":[[0,1,1],[1,2,1],[0,1,1]],"dps":0,"heal":0,"buff":0,"np":0,"tag":{"aoe":0,"extra":0,"dot":0,"ret":0}},{"name":"伊根·灭刃","isEnable":true,"buffPattern":[[0,0,0],[0,2,0],[0,0,0]],"dps":85,"heal":0,"buff":0,"np":0,"tag":{"aoe":0,"extra":60,"dot":100,"ret":0}},{"name":"赫格尼","isEnable":true,"buffPattern":[[1,0,0],[2,1,1],[1,1,1]],"dps":0,"heal":60,"buff":0,"np":40,"tag":{"aoe":0,"extra":0,"dot":0,"ret":0}},{"name":"洛贝拉","isEnable":true,"buffPattern":[[0,1,1],[2,1,1],[0,1,1]],"dps":100,"heal":0,"buff":0,"np":0,"tag":{"aoe":100,"extra":0,"dot":0,"ret":0}},{"name":"赤夕","isEnable":true,"buffPattern":[[1,1,1],[1,1,2],[0,0,1]],"dps":0,"heal":100,"buff":80,"np":60,"tag":{"aoe":0,"extra":0,"dot":0,"ret":0}},{"name":"利兹","isEnable":false,"buffPattern":[[1,1,0],[2,1,1],[1,1,0]],"dps":0,"heal":60,"buff":0,"np":20,"tag":{"aoe":0,"extra":0,"dot":0,"ret":0}},{"name":"冕羽","isEnable":false,"buffPattern":[[1,2,0],[1,1,1],[1,1,0]],"dps":60,"heal":0,"buff":0,"np":0,"tag":{"aoe":0,"extra":0,"dot":0,"ret":0}},{"name":"岁稔","isEnable":true,"buffPattern":[[2,1,0],[1,1,1],[1,1,0]],"dps":0,"heal":60,"buff":60,"np":60,"tag":{"aoe":0,"extra":0,"dot":0,"ret":0}},{"name":"卡提那·联域","isEnable":true,"buffPattern":[[1,2,0],[1,2,1],[1,1,0]],"dps":100,"heal":0,"buff":0,"np":0,"tag":{"aoe":100,"extra":100,"dot":0,"ret":0}},{"name":"乌琳","isEnable":true,"buffPattern":[[0,1,2],[1,1,1],[0,1,1]],"dps":0,"heal":0,"buff":60,"np":80,"tag":{"aoe":0,"extra":0,"dot":0,"ret":0}},{"name":"琶音","isEnable":true,"buffPattern":[[2,1,0],[2,1,1],[1,1,0]],"dps":0,"heal":60,"buff":40,"np":60,"tag":{"aoe":0,"extra":0,"dot":0,"ret":0}},{"name":"随想曲","isEnable":true,"buffPattern":[[0,0,1],[1,1,1],[0,1,2]],"dps":0,"heal":0,"buff":60,"np":100,"tag":{"aoe":0,"extra":0,"dot":0,"ret":0}},{"name":"圣歌","isEnable":true,"buffPattern":[[0,1,1],[2,1,1],[0,1,1]],"dps":0,"heal":80,"buff":0,"np":0,"tag":{"aoe":0,"extra":0,"dot":0,"ret":0}},{"name":"进行曲","isEnable":true,"buffPattern":[[1,1,0],[1,1,2],[1,0,0]],"dps":0,"heal":0,"buff":100,"np":0,"tag":{"aoe":0,"extra":0,"dot":0,"ret":0}},{"name":"旋律","isEnable":true,"buffPattern":[[1,0,0],[1,1,1],[2,1,1]],"dps":0,"heal":60,"buff":0,"np":0,"tag":{"aoe":0,"extra":0,"dot":0,"ret":0}},{"name":"袅韵","isEnable":true,"buffPattern":[[2,1,0],[2,1,1],[1,1,0]],"dps":0,"heal":80,"buff":0,"np":80,"tag":{"aoe":0,"extra":0,"dot":0,"ret":0}},{"name":"刃齿","isEnable":true,"buffPattern":[[0,1,1],[1,2,1],[0,1,1]],"dps":60,"heal":0,"buff":0,"np":0,"tag":{"aoe":60,"extra":0,"dot":0,"ret":0}},{"name":"巴德兰兹","isEnable":false,"buffPattern":[[2,1,1],[1,1,1],[0,0,1]],"dps":0,"heal":0,"buff":80,"np":0,"tag":{"aoe":0,"extra":0,"dot":0,"ret":0}},{"name":"绯猁","isEnable":false,"buffPattern":[[1,1,1],[1,1,2],[0,0,1]],"dps":0,"heal":0,"buff":0,"np":0,"tag":{"aoe":0,"extra":0,"dot":0,"ret":0}},{"name":"赤溟","isEnable":true,"buffPattern":[[2,1,1],[1,1,1],[0,0,1]],"dps":50,"heal":0,"buff":0,"np":0,"tag":{"aoe":0,"extra":40,"dot":0,"ret":0}},{"name":"刺蝽","isEnable":false,"buffPattern":[[1,0,0],[1,1,1],[1,2,1]],"dps":0,"heal":0,"buff":0,"np":0,"tag":{"aoe":0,"extra":0,"dot":0,"ret":0}},{"name":"幽兰","isEnable":false,"buffPattern":[[1,0,0],[1,2,1],[1,1,1]],"dps":0,"heal":0,"buff":40,"np":0,"tag":{"aoe":0,"extra":0,"dot":0,"ret":0}},{"name":"哈托莉","isEnable":false,"buffPattern":[[1,0,0],[1,1,1],[1,2,1]],"dps":0,"heal":0,"buff":0,"np":0,"tag":{"aoe":0,"extra":0,"dot":0,"ret":0}},{"name":"杜兰德尔","isEnable":true,"buffPattern":[[1,0,0],[1,1,2],[1,1,1]],"dps":60,"heal":0,"buff":0,"np":0,"tag":{"aoe":60,"extra":0,"dot":0,"ret":0}},{"name":"卡提那","isEnable":false,"buffPattern":[[1,0,0],[1,1,2],[1,1,1]],"dps":0,"heal":40,"buff":0,"np":0,"tag":{"aoe":0,"extra":0,"dot":0,"ret":0}},{"name":"缇尔锋","isEnable":true,"buffPattern":[[1,1,2],[1,1,1],[0,0,1]],"dps":70,"heal":0,"buff":0,"np":0,"tag":{"aoe":0,"extra":0,"dot":0,"ret":80}},{"name":"艾穆尔","isEnable":false,"buffPattern":[[0,1,1],[1,1,1],[0,1,2]],"dps":40,"heal":0,"buff":0,"np":0,"tag":{"aoe":0,"extra":0,"dot":0,"ret":60}},{"name":"波塞冬","isEnable":false,"buffPattern":[[1,2,0],[1,2,1],[1,1,0]],"dps":0,"heal":0,"buff":60,"np":0,"tag":{"aoe":0,"extra":0,"dot":0,"ret":0}},{"name":"努特","isEnable":false,"buffPattern":[[2,1,0],[2,1,1],[1,1,0]],"dps":0,"heal":0,"buff":40,"np":0,"tag":{"aoe":0,"extra":0,"dot":0,"ret":0}},{"name":"鸣刃","isEnable":true,"buffPattern":[[0,1,1],[1,1,2],[0,1,1]],"dps":60,"heal":0,"buff":0,"np":0,"tag":{"aoe":0,"extra":0,"dot":0,"ret":0}},{"name":"朝晖","isEnable":true,"buffPattern":[[1,1,2],[1,1,1],[0,0,1]],"dps":75,"heal":0,"buff":0,"np":0,"tag":{"aoe":40,"extra":60,"dot":0,"ret":0}},{"name":"夜暝","isEnable":true,"buffPattern":[[0,1,1],[1,1,1],[0,1,2]],"dps":0,"heal":0,"buff":0,"np":0,"tag":{"aoe":0,"extra":0,"dot":0,"ret":0}},{"name":"阿尔卑斯","isEnable":true,"buffPattern":[[1,1,0],[1,1,2],[1,1,0]],"dps":0,"heal":50,"buff":0,"np":0,"tag":{"aoe":0,"extra":0,"dot":0,"ret":0}}];
+// ========================================================
+
+
+let characters = [];
+let selectedIndex = -1;
+
+const $ = id => document.getElementById(id);
+
+const defaults = () => ({
+  name: "新角色",
+  isEnable: true,
+  buffPattern: [
+    [0,0,0],
+    [0,2,0],
+    [0,0,0]
+  ],
+  dps: 0,
+  heal: 0,
+  buff: 0,
+  np: 0,
+  tag: {
+    aoe: 0,
+    extra: 0,
+    dot: 0,
+    ret: 0
+  }
+});
+
+function normalizeCharacter(c){
+  const d = defaults();
+  return {
+    name: String(c?.name ?? d.name),
+    isEnable: Boolean(c?.isEnable ?? d.isEnable),
+    buffPattern: normalizePattern(c?.buffPattern),
+    dps: Number(c?.dps ?? 0),
+    heal: Number(c?.heal ?? 0),
+    buff: Number(c?.buff ?? 0),
+    np: Number(c?.np ?? 0),
+    tag: {
+      aoe: Number(c?.tag?.aoe ?? 0),
+      extra: Number(c?.tag?.extra ?? 0),
+      dot: Number(c?.tag?.dot ?? 0),
+      ret: Number(c?.tag?.ret ?? 0)
+    }
+  };
+}
+
+function normalizePattern(p){
+  const out = Array.from({length:3},()=>[0,0,0]);
+  if(Array.isArray(p)){
+    for(let r=0;r<3;r++){
+      for(let c=0;c<3;c++){
+        const v = Number(p?.[r]?.[c] ?? 0);
+        out[r][c] = [0,1,2].includes(v) ? v : 0;
+      }
+    }
+  } else {
+    out[1][1] = 2;
+  }
+  return out;
+}
+
+function saveStorage(){
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(characters));
+}
+
+function loadStorage(){
+  try{
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if(raw){
+      characters = JSON.parse(raw).map(normalizeCharacter);
+    }else{
+      characters = structuredClone(DEFAULT_CHARACTERS).map(normalizeCharacter);
+    }
+  }catch(e){
+    console.warn("localStorage 读取失败", e);
+    characters = structuredClone(DEFAULT_CHARACTERS).map(normalizeCharacter);
+  }
+}
+
+function renderList(){
+  const q = $("searchInput").value.trim().toLowerCase();
+  $("charList").innerHTML = "";
+
+  characters.forEach((c, index)=>{
+    if(q && !c.name.toLowerCase().includes(q)) return;
+
+    const item = document.createElement("div");
+    item.className = "char-item" + (index === selectedIndex ? " active" : "");
+    item.innerHTML = `
+      <div class="char-name">${escapeHtml(c.name)}</div>
+      <div class="badge ${c.isEnable ? "" : "off"}">${c.isEnable ? "启用" : "禁用"}</div>
+    `;
+    item.onclick = ()=>selectCharacter(index);
+    $("charList").appendChild(item);
+  });
+
+  if(characters.length === 0){
+    $("emptyState").hidden = false;
+    $("editor").hidden = true;
+  }
+}
+
+function renderPattern(){
+  const grid = $("patternGrid");
+  grid.innerHTML = "";
+  if(selectedIndex < 0) return;
+
+  const p = characters[selectedIndex].buffPattern;
+  for(let r=0;r<3;r++){
+    for(let c=0;c<3;c++){
+      const v = p[r][c];
+      const cell = document.createElement("div");
+      cell.className = `cell v${v}`;
+      cell.textContent = v === 0 ? "空" : v === 1 ? "BUFF" : "自身";
+      cell.title = `(${r}, ${c}) = ${v}`;
+      cell.onclick = ()=>{
+        p[r][c] = (p[r][c] + 1) % 3;
+        saveStorage();
+        renderPattern();
+        renderPreview();
+      };
+      grid.appendChild(cell);
+    }
+  }
+}
+
+function selectCharacter(index){
+  selectedIndex = index;
+  $("emptyState").hidden = true;
+  $("editor").hidden = false;
+
+  const c = characters[index];
+  $("nameInput").value = c.name;
+  $("enableInput").checked = c.isEnable;
+  $("enableText").textContent = c.isEnable ? "启用" : "禁用";
+  $("dpsInput").value = c.dps;
+  $("healInput").value = c.heal;
+  $("buffInput").value = c.buff;
+  $("npInput").value = c.np;
+  $("aoeInput").value = c.tag.aoe;
+  $("extraInput").value = c.tag.extra;
+  $("dotInput").value = c.tag.dot;
+  $("retInput").value = c.tag.ret;
+  $("editorTitle").textContent = c.name;
+
+  renderPattern();
+  renderPreview();
+  renderList();
+}
+
+function syncFormToModel(){
+  if(selectedIndex < 0) return;
+  const c = characters[selectedIndex];
+
+  c.name = $("nameInput").value.trim() || "未命名角色";
+  c.isEnable = $("enableInput").checked;
+  c.dps = numberOf("dpsInput");
+  c.heal = numberOf("healInput");
+  c.buff = numberOf("buffInput");
+  c.np = numberOf("npInput");
+  c.tag.aoe = numberOf("aoeInput");
+  c.tag.extra = numberOf("extraInput");
+  c.tag.dot = numberOf("dotInput");
+  c.tag.ret = numberOf("retInput");
+
+  $("enableText").textContent = c.isEnable ? "启用" : "禁用";
+  $("editorTitle").textContent = c.name;
+  saveStorage();
+  renderList();
+  renderPreview();
+}
+
+function numberOf(id){
+  const input = $(id);
+  let n = Number(input.value);
+  if(!Number.isFinite(n)) n = 0;
+  n = Math.max(0, Math.min(100, n));
+  input.value = n;
+  return n;
+}
+
+function renderPreview(){
+  if(selectedIndex < 0) return;
+  $("jsonPreview").textContent = JSON.stringify(characters[selectedIndex], null, 4);
+}
+
+function addCharacter(){
+  characters.push(defaults());
+  selectedIndex = characters.length - 1;
+  saveStorage();
+  renderList();
+  selectCharacter(selectedIndex);
+  $("nameInput").select();
+}
+
+function deleteCurrent(){
+  if(selectedIndex < 0) return;
+  const name = characters[selectedIndex].name;
+  if(!confirm(`确定删除角色“${name}”吗？`)) return;
+
+  characters.splice(selectedIndex,1);
+  if(characters.length === 0){
+    selectedIndex = -1;
+  }else{
+    selectedIndex = Math.min(selectedIndex, characters.length - 1);
+  }
+  saveStorage();
+  renderList();
+  if(selectedIndex >= 0) selectCharacter(selectedIndex);
+}
+
+function duplicateCurrent(){
+  if(selectedIndex < 0) return;
+  const copy = structuredClone(characters[selectedIndex]);
+  copy.name = copy.name + " - 副本";
+  characters.splice(selectedIndex + 1, 0, copy);
+  selectedIndex++;
+  saveStorage();
+  renderList();
+  selectCharacter(selectedIndex);
+}
+
+function downloadJson(data, filename){
+  const blob = new Blob([JSON.stringify(data, null, 4)], {type:"application/json;charset=utf-8"});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}
+
+function exportAll(){
+  downloadJson(characters, "characters.json");
+}
+
+function exportOne(){
+  if(selectedIndex < 0){
+    alert("请先选择一个角色。");
+    return;
+  }
+  const safe = characters[selectedIndex].name.replace(/[\\/:*?"<>|]/g, "_");
+  downloadJson(characters[selectedIndex], `${safe || "character"}.json`);
+}
+
+async function importJson(file){
+  try{
+    const text = await file.text();
+    const parsed = JSON.parse(text);
+
+    let incoming;
+    if(Array.isArray(parsed)){
+      incoming = parsed;
+    }else if(parsed && Array.isArray(parsed.characters)){
+      incoming = parsed.characters;
+    }else if(parsed && typeof parsed === "object"){
+      incoming = [parsed];
+    }else{
+      throw new Error("JSON 顶层必须是角色对象、角色数组，或包含 characters 数组的对象。");
+    }
+
+    const normalized = incoming.map(normalizeCharacter);
+
+    const mode = characters.length
+      ? confirm(`读取到 ${normalized.length} 个角色。\n\n点“确定”= 追加导入\n点“取消”= 覆盖当前全部数据`)
+        ? "append" : "replace"
+      : "replace";
+
+    if(mode === "append") characters.push(...normalized);
+    else characters = normalized;
+
+    selectedIndex = characters.length ? 0 : -1;
+    saveStorage();
+    renderList();
+    if(selectedIndex >= 0) selectCharacter(selectedIndex);
+  }catch(err){
+    alert("导入失败：\n" + err.message + "\n\n注意：标准 JSON 最后一项后面不能带逗号。");
+  }
+}
+
+function clearAll(){
+  if(!characters.length) return;
+  if(!confirm("确定清空全部角色数据吗？此操作不可撤销。")) return;
+  characters = [];
+  selectedIndex = -1;
+  saveStorage();
+  renderList();
+}
+
+function escapeHtml(s){
+  return String(s).replace(/[&<>"']/g, ch => ({
+    "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"
+  })[ch]);
+}
+
+
+function simClamp(id, fallback=0){
+  let n = Number($(id).value);
+  if(!Number.isFinite(n)) n = fallback;
+  n = Math.max(Number($(id).min || 0), Math.min(Number($(id).max || 100), n));
+  $(id).value = n;
+  return n;
+}
+
+function getCandidateGroups(){
+  const raw = $("candidateInput").value.trim();
+
+  if(!raw){
+    const names = characters
+      .filter(c => c.isEnable || $("teamIncludeDisabled").checked)
+      .map(c => c.name);
+    return names.map(name => [name]);
+  }
+
+  const parsed = JSON.parse(raw);
+  let groups = [];
+
+  if(Array.isArray(parsed)){
+    if(parsed.every(x => typeof x === "string")){
+      groups = [parsed.map(String)];
+    }else{
+      for(const group of parsed){
+        if(Array.isArray(group)) groups.push(group.map(String));
+        else if(typeof group === "string") groups.push([String(group)]);
+      }
+    }
+  }else{
+    throw new Error("候选数据必须是字符串数组，或多个字符串数组组成的数组。");
+  }
+
+  // 全局去重：同一角色只保留第一次出现的位置
+  const seen = new Set();
+  const deduped = [];
+  for(const group of groups){
+    const clean = [];
+    for(const name of group){
+      if(!seen.has(name)){
+        seen.add(name);
+        clean.push(name);
+      }
+    }
+    if(clean.length) deduped.push(clean);
+  }
+  return deduped;
+}
+
+function priorityFactor(priority){
+  // 优先级只做“轻度偏好”，不再压过明显的属性差距
+  // P1=1.18, P2=1.12, P3=1.06, P4=1.00
+  return 1 + (4-priority)*0.06;
+}
+
+function preliminaryCandidateScore(c, preliminary, target, modes, priorities){
+  const keys = ["dps","np","heal","buff"];
+  const labels = {dps:"DPS",np:"NP",heal:"Heal",buff:"Buff"};
+
+  // 先看当前“预选池”已经拥有什么，第一阶段也会考虑整体补强
+  const current = {};
+  const deficit = {};
+
+  for(const key of keys){
+    current[key] = teamMetric(preliminary,key,modes[key]);
+    const goal = Math.max(0,Number(target[key])||0);
+    deficit[key] = goal > 0 && current[key] < goal
+      ? (goal-current[key])/goal
+      : 0;
+  }
+
+  let score = 0;
+  const strong = [];
+  const perfect = [];
+
+  for(const key of keys){
+    const value = Number(c[key]||0);
+
+    // 普通情况下仍保留软优先级
+    let p = priorityFactor(priorities[key]);
+
+    // 单项 >=90：这项已经足够突出，弱化优先级影响
+    // 例如 NP 95 不应因为 NP=P2 就被 DPS 70(P1)压住。
+    if(value >= 90){
+      p = 1.16;
+      strong.push(`${labels[key]} ${value}`);
+    }
+
+    // 单项 100：顶级特长，给非常明显的额外奖励
+    if(value >= 100){
+      perfect.push(`${labels[key]} 100`);
+    }
+
+    // 基础个人能力
+    score += value * p;
+
+    // 当前预选队伍缺什么，就额外奖励能补该项的人
+    // 这样第一阶段也不会只看单卡强度。
+    if(deficit[key] > 0){
+      score += value * (0.35 + deficit[key]*0.9);
+    }
+
+    // >=90 特长额外奖励，但不是绝对锁定
+    if(value >= 90 && value < 100){
+      score += 18 + (value-90)*1.8;
+    }
+
+    // 100 分基本视作“王牌特长”
+    if(value >= 100){
+      score += 65;
+    }
+  }
+
+  // 若一个角色多项都很高，再补一点综合奖励
+  const sorted = keys.map(k=>Number(c[k]||0)).sort((a,b)=>b-a);
+  score += sorted[0]*0.18 + sorted[1]*0.08;
+
+  let reason = "";
+  if(perfect.length){
+    reason = `100分特长：${perfect.join(" / ")}`;
+  }else if(strong.length){
+    reason = `高分特长：${strong.join(" / ")}，同时考虑当前预选队伍缺口`;
+  }else{
+    const biggestNeed = [...keys].sort((a,b)=>deficit[b]-deficit[a])[0];
+    reason = deficit[biggestNeed] > 0
+      ? `综合评分 + 补强 ${labels[biggestNeed]}`
+      : "综合评分";
+  }
+
+  return {score,reason};
+}
+
+function selectOneFromEachGroup(groups, priorities, includeDisabled, target, modes){
+  const preliminary = [];
+  const log = [];
+  const used = new Set();
+
+  for(let gi=0; gi<groups.length; gi++){
+    const groupNames = groups[gi];
+
+    const candidates = groupNames
+      .map(name=>characters.find(c=>c.name===name))
+      .filter(Boolean)
+      .filter(c=>includeDisabled || c.isEnable)
+      .filter(c=>!used.has(c.name));
+
+    let candidatePool = candidates;
+    let fallbackUsed = false;
+
+    if(!candidatePool.length){
+      // 正常筛选后没人可选时，不跳过。
+      // 退化为从该数组中“实际存在于角色 JSON 的角色”里，
+      // 选择综合评分最高者。此时允许把禁用角色作为兜底，
+      // 这样每个数组都尽量能产出 1 名预选角色。
+      candidatePool = groupNames
+        .map(name=>characters.find(c=>c.name===name))
+        .filter(Boolean)
+        .filter(c=>!used.has(c.name));
+
+      fallbackUsed = true;
+    }
+
+    if(!candidatePool.length){
+      // 只有当数组里的角色名在角色 JSON 中一个都不存在时，才无法选人。
+      log.push(`数组 [${gi}]：数组内角色均未在角色 JSON 中找到，无法预选。`);
+      continue;
+    }
+
+    // DPS 质量规则：
+    // 100 = 硬优先。
+    // >=85 = 高质量主C。如果当前预选池还没有 2 个 DPS>=80，
+    // 那么本数组出现 DPS>=85 时，优先从这些高DPS角色中选择。
+    // 这样不会出现两个 60 分DPS已经“凑够阈值”，却把 85~99 的主C丢掉。
+    const dps100Pool = candidatePool.filter(c => Number(c.dps||0) >= 100);
+    const dps85Pool = candidatePool.filter(c => Number(c.dps||0) >= 85);
+    const currentHighDpsCount = preliminary.filter(c => Number(c.dps||0) >= 80).length;
+
+    let effectivePool = candidatePool;
+    let dpsRule = "";
+
+    if(dps100Pool.length){
+      effectivePool = dps100Pool;
+      dpsRule = "DPS 100 硬优先";
+    }else if(dps85Pool.length && currentHighDpsCount < 2){
+      effectivePool = dps85Pool;
+      dpsRule = "DPS 85+ 主C优先";
+    }
+
+    let best = null;
+    for(const c of effectivePool){
+      const detail = preliminaryCandidateScore(c,preliminary,target,modes,priorities);
+
+      if(dpsRule === "DPS 100 硬优先"){
+        detail.score += 500;
+        detail.reason = `${dpsRule}；${detail.reason}`;
+      }else if(dpsRule === "DPS 85+ 主C优先"){
+        detail.score += 180;
+        detail.reason = `${dpsRule}；${detail.reason}`;
+      }
+
+      if(!best || detail.score > best.score){
+        best = {ch:c,score:detail.score,reason:detail.reason};
+      }
+    }
+
+    preliminary.push(best.ch);
+    used.add(best.ch.name);
+    log.push(
+      `数组 [${gi}] ${JSON.stringify(groupNames)} → 预选 ${best.ch.name}` +
+      `（DPS ${best.ch.dps} / NP ${best.ch.np} / Heal ${best.ch.heal} / Buff ${best.ch.buff}，评分 ${best.score.toFixed(1)}，${best.reason}` +
+      `${fallbackUsed ? "，正常规则无可选角色，已使用综合评分兜底" : ""}）`
+    );
+  }
+
+  return {preliminary,log};
+}
+
+function finalTeamCandidateScore(c, team, target, modes, priorities){
+  const keys = ["dps","np","heal","buff"];
+  const labels = {dps:"DPS",np:"NP",heal:"Heal",buff:"Buff"};
+
+  const current = {};
+  const unmet = [];
+  const deficit = {};
+
+  for(const key of keys){
+    current[key] = teamMetric(team,key,modes[key]);
+    const goal = Math.max(0,Number(target[key])||0);
+
+    if(goal > 0 && current[key] < goal){
+      deficit[key] = (goal-current[key])/goal;
+      unmet.push(key);
+    }else{
+      deficit[key] = 0;
+    }
+  }
+
+  let score = 0;
+  let reason = "";
+
+  if(team.length === 0){
+    // 最终队伍第一人仍偏向强输出，但不是绝对。
+    score =
+      Number(c.dps||0) * 1.28 * priorityFactor(priorities.dps) +
+      Number(c.np||0)  * 0.92 * priorityFactor(priorities.np) +
+      Number(c.heal||0)* 0.78 * priorityFactor(priorities.heal) +
+      Number(c.buff||0)* 0.82 * priorityFactor(priorities.buff);
+
+    return {score,reason:"最终队伍首位：偏向输出，同时考虑整体强度"};
+  }
+
+  if(unmet.length){
+    // 队伍补强阶段：未达标项目是主导，但属性实际数值依然很重要。
+    for(const key of keys){
+      const value = Number(c[key]||0);
+      const p = priorityFactor(priorities[key]);
+
+      if(unmet.includes(key)){
+        // 缺口越大，越重视；优先级只做温和修正
+        const gapWeight = 1.0 + deficit[key]*2.4;
+        score += value * p * gapWeight;
+
+        const gap = Math.max(0,(Number(target[key])||0)-current[key]);
+        if(modes[key] === "sum" && value >= gap){
+          score += 22 * p;
+        }else if(modes[key] === "avg" && value >= Number(target[key]||0)){
+          score += 18 * p;
+        }
+      }else{
+        // 已达标属性依然保留少量价值，避免为了补弱项选到整体太差的人
+        score += value * p * 0.18;
+      }
+    }
+
+    const ordered = [...unmet].sort((a,b)=>{
+      if(deficit[a] !== deficit[b]) return deficit[b]-deficit[a];
+      return priorities[a]-priorities[b];
+    });
+    reason = "补强：" + ordered.map(k=>
+      `${labels[k]} 缺${(deficit[k]*100).toFixed(0)}%`
+    ).join(" / ");
+  }else{
+    // 全部达标后，纯看整体强度 + 温和优先级
+    score = ["dps","np","heal","buff"].reduce((s,key)=>
+      s + Number(c[key]||0) * priorityFactor(priorities[key])
+    ,0);
+    reason = "阈值已满足，补整体强度";
+  }
+
+  return {score,reason};
+}
+
+function buildFinalTeam(preliminary,size,target,modes,priorities){
+  const team = [];
+  let remain = [...preliminary];
+  const log = [];
+
+  // 最终配队硬规则：
+  // 预选池里只要存在 DPS=100，就优先锁进最终队伍。
+  // 如果 DPS=100 超过 5 个，则根据其它属性综合评分选最好的 5 个。
+  const dps100 = remain
+    .filter(c => Number(c.dps||0) >= 100)
+    .sort((a,b)=>{
+      const aSecondary = Number(a.np||0)+Number(a.heal||0)+Number(a.buff||0);
+      const bSecondary = Number(b.np||0)+Number(b.heal||0)+Number(b.buff||0);
+      return bSecondary-aSecondary;
+    });
+
+  for(const c of dps100){
+    if(team.length >= size) break;
+    team.push(c);
+    log.push(
+      `最终队伍 ${team.length}/5：锁定 ${c.name}` +
+      `（DPS 100 硬优先，NP ${c.np} / Heal ${c.heal} / Buff ${c.buff}）`
+    );
+  }
+
+  const locked = new Set(team.map(c=>c.name));
+  remain = remain.filter(c=>!locked.has(c.name));
+
+  while(team.length < size && remain.length){
+    let bestIndex = 0;
+    let best = null;
+
+    remain.forEach((c,i)=>{
+      const detail = finalTeamCandidateScore(c,team,target,modes,priorities);
+      if(!best || detail.score > best.score){
+        best = {ch:c,score:detail.score,reason:detail.reason};
+        bestIndex = i;
+      }
+    });
+
+    const picked = remain.splice(bestIndex,1)[0];
+    team.push(picked);
+
+    const state = ["dps","np","heal","buff"].map(key=>{
+      const value = teamMetric(team,key,modes[key]);
+      const ok = value >= Number(target[key]||0);
+      return `${key.toUpperCase()} ${value.toFixed(1)}${ok?"✓":""}`;
+    }).join(" / ");
+
+    log.push(
+      `最终队伍 ${team.length}/5：选择 ${picked.name}` +
+      `（${best.reason}，评分 ${best.score.toFixed(1)}）`
+    );
+    log.push(`当前：${state}`);
+  }
+
+
+  // 高质量主C保障：
+  // 最终队伍尽量至少保留 2 个 DPS>=80 的角色。
+  // 如果预选池里还有 DPS>=85，但最终队伍高DPS不足2个，
+  // 就优先替换队伍中 DPS<80 的角色。
+  let highDpsGuard = true;
+  while(highDpsGuard){
+    highDpsGuard = false;
+
+    const teamHigh = team.filter(c => Number(c.dps||0) >= 80).length;
+    if(teamHigh >= 2) break;
+
+    const highCandidates = remain
+      .map((c,index)=>({c,index}))
+      .filter(x => Number(x.c.dps||0) >= 85)
+      .sort((a,b)=>Number(b.c.dps||0)-Number(a.c.dps||0));
+
+    if(!highCandidates.length) break;
+
+    const replaceable = team
+      .map((c,index)=>({c,index}))
+      .filter(x => Number(x.c.dps||0) < 80 && Number(x.c.dps||0) < 100)
+      .sort((a,b)=>{
+        // 优先替换低DPS；若DPS一样，再替换辅助总值更低的
+        const dpsDiff = Number(a.c.dps||0)-Number(b.c.dps||0);
+        if(dpsDiff !== 0) return dpsDiff;
+        const av = Number(a.c.np||0)+Number(a.c.heal||0)+Number(a.c.buff||0);
+        const bv = Number(b.c.np||0)+Number(b.c.heal||0)+Number(b.c.buff||0);
+        return av-bv;
+      });
+
+    if(!replaceable.length) break;
+
+    const upgrade = highCandidates[0];
+    const target = replaceable[0];
+
+    const oldChar = team[target.index];
+    const newChar = upgrade.c;
+
+    team[target.index] = newChar;
+    remain.splice(upgrade.index,1);
+    remain.push(oldChar);
+
+    log.push(
+      `高质量DPS保障：${oldChar.name}(DPS ${oldChar.dps}) → ${newChar.name}(DPS ${newChar.dps})` +
+      `（最终队伍 DPS>=80 不足2人，候选中存在 DPS>=85 主C）`
+    );
+
+    highDpsGuard = true;
+  }
+
+  // DPS 档位优化：
+  // 如果队伍里已经塞了两个及以上 50~79 的中低 DPS，
+  // 而预选池剩余角色里出现 DPS>=80，则优先替换掉最低 DPS 的那一个。
+  // 这是硬规则，避免用两个 60 左右的角色占槽，却漏掉 80+ 主输出。
+  let replacementDone = true;
+  while(replacementDone){
+    replacementDone = false;
+
+    const lowDpsMembers = team
+      .map((c,index)=>({c,index}))
+      .filter(x => Number(x.c.dps||0) >= 50 && Number(x.c.dps||0) < 80)
+      .sort((a,b)=>Number(a.c.dps||0)-Number(b.c.dps||0));
+
+    if(lowDpsMembers.length < 2) break;
+
+    const upgradeCandidates = remain
+      .map((c,index)=>({c,index}))
+      .filter(x => Number(x.c.dps||0) >= 80)
+      .sort((a,b)=>Number(b.c.dps||0)-Number(a.c.dps||0));
+
+    if(!upgradeCandidates.length) break;
+
+    const replaceTarget = lowDpsMembers[0];
+    const upgrade = upgradeCandidates[0];
+
+    const oldChar = team[replaceTarget.index];
+    const newChar = upgrade.c;
+
+    team[replaceTarget.index] = newChar;
+    remain.splice(upgrade.index,1);
+    remain.push(oldChar);
+
+    log.push(
+      `DPS 档位优化：${oldChar.name}(DPS ${oldChar.dps}) → ${newChar.name}(DPS ${newChar.dps})` +
+      `（检测到队伍中至少两个 50~79 DPS，而候选中存在 80+，执行优先替换）`
+    );
+
+    replacementDone = true;
+  }
+
+  return {team,log};
+}
+
+function chooseTeamByGroups(groups,size,target,modes,priorities,includeDisabled){
+  const firstStage = selectOneFromEachGroup(groups,priorities,includeDisabled,target,modes);
+  const secondStage = buildFinalTeam(firstStage.preliminary,size,target,modes,priorities);
+
+  const log = [
+    `第一阶段完成：${groups.length} 个数组 → 预选 ${firstStage.preliminary.length} 人`,
+    ...firstStage.log,
+    `第二阶段：从 ${firstStage.preliminary.length} 名预选角色中选最终固定 ${size} 人`,
+    ...secondStage.log
+  ];
+
+  if(secondStage.team.length < size){
+    log.push(`最终人数不足：仅有 ${secondStage.team.length}/${size} 人。`);
+  }else{
+    log.push(`最终 5 人已选定，开始九宫格摆位。`);
+  }
+
+  return {
+    team:secondStage.team,
+    preliminary:firstStage.preliminary,
+    log
+  };
+}
+
+function totalStats(team){
+  return team.reduce((s,c)=>({
+    dps:s.dps+c.dps,
+    heal:s.heal+c.heal,
+    buff:s.buff+c.buff,
+    np:s.np+c.np
+  }), {dps:0,heal:0,buff:0,np:0});
+}
+
+function averageStats(team){
+  if(!team.length) return {dps:0,heal:0,buff:0,np:0};
+  const sum = totalStats(team);
+  return {
+    dps:sum.dps/team.length,
+    heal:sum.heal/team.length,
+    buff:sum.buff/team.length,
+    np:sum.np/team.length
+  };
+}
+
+function teamMetric(team, key, mode){
+  if(mode === "sum") return totalStats(team)[key];
+  return averageStats(team)[key];
+}
+
+function tagTotals(team){
+  return team.reduce((s,c)=>{
+    s.aoe += Number(c.tag?.aoe||0);
+    s.extra += Number(c.tag?.extra||0);
+    s.dot += Number(c.tag?.dot||0);
+    s.ret += Number(c.tag?.ret||0);
+    return s;
+  }, {aoe:0,extra:0,dot:0,ret:0});
+}
+
+function patternOffsets(ch, value){
+  const out = [];
+  const p = normalizePattern(ch.buffPattern);
+  // 以九宫格中心 [1,1] 作为摆放锚点
+  for(let r=0;r<3;r++){
+    for(let c=0;c<3;c++){
+      if(p[r][c] === value) out.push([r-1,c-1]);
+    }
+  }
+  // 没有自身格时兜底为中心占一格
+  if(value === 2 && out.length === 0) out.push([0,0]);
+  return out;
+}
+
+function cellIndex(r,c){ return r*3+c; }
+function inside(r,c){ return r>=0 && r<3 && c>=0 && c<3; }
+
+function buildPlacement(team){
+  if(!team.length) return null;
+
+  // 高 DPS 先参与搜索，便于更早剪枝 / 得到较好解
+  const order = [...team].sort((a,b)=>b.dps-a.dps);
+  let best = null;
+  const occupied = Array(9).fill(null);
+  const placed = [];
+
+  function canPlace(ch, ar, ac){
+    const footprint = patternOffsets(ch,2);
+    const cells = [];
+    for(const [dr,dc] of footprint){
+      const r=ar+dr, c=ac+dc;
+      if(!inside(r,c)) return null;
+      const idx = cellIndex(r,c);
+      if(occupied[idx]) return null;
+      cells.push(idx);
+    }
+    return cells;
+  }
+
+  function scoreCurrent(){
+    const byName = new Map();
+    for(const p of placed) byName.set(p.ch.name,p);
+
+    const buffSources = {};
+    for(const p of placed) buffSources[p.ch.name] = new Set();
+
+    // 每个施法者的黄色格，命中另一角色任一占用格即算该来源 Buff 1 次
+    for(const src of placed){
+      const buffCells = new Set();
+      for(const [dr,dc] of patternOffsets(src.ch,1)){
+        const r=src.ar+dr, c=src.ac+dc;
+        if(inside(r,c)) buffCells.add(cellIndex(r,c));
+      }
+
+      for(const dst of placed){
+        if(dst === src) continue;
+        if(dst.cells.some(idx=>buffCells.has(idx))){
+          buffSources[dst.ch.name].add(src.ch.name);
+        }
+      }
+    }
+
+    const topDps = Math.max(...placed.map(x=>x.ch.dps));
+    let score = 0;
+
+    for(const dst of placed){
+      for(const srcName of buffSources[dst.ch.name]){
+        const src = byName.get(srcName).ch;
+        // 高 DPS 吃 Buff 权重最大；Buff 高的来源也更有价值
+        score += (dst.ch.dps + 25) * (0.7 + src.buff/100);
+        if(dst.ch.dps === topDps) score += 65;
+      }
+      // 轻微偏好核心 DPS 靠中心，减少边缘浪费
+      if(dst.ch.dps === topDps){
+        const dist = Math.abs(dst.ar-1)+Math.abs(dst.ac-1);
+        score += (2-dist)*15;
+      }
+    }
+
+    return {score,buffSources};
+  }
+
+  function dfs(i){
+    if(i === order.length){
+      const s = scoreCurrent();
+      if(!best || s.score > best.score){
+        best = {
+          score:s.score,
+          buffSources:Object.fromEntries(
+            Object.entries(s.buffSources).map(([k,v])=>[k,[...v]])
+          ),
+          placed:placed.map(p=>({
+            ch:p.ch, ar:p.ar, ac:p.ac, cells:[...p.cells]
+          }))
+        };
+      }
+      return;
+    }
+
+    const ch = order[i];
+    for(let ar=0;ar<3;ar++){
+      for(let ac=0;ac<3;ac++){
+        const cells = canPlace(ch,ar,ac);
+        if(!cells) continue;
+        cells.forEach(idx=>occupied[idx]=ch.name);
+        placed.push({ch,ar,ac,cells});
+        dfs(i+1);
+        placed.pop();
+        cells.forEach(idx=>occupied[idx]=null);
+      }
+    }
+  }
+
+  dfs(0);
+  return best;
+}
+
+function renderFormation(result, team){
+  const grid = $("formationGrid");
+  grid.innerHTML = "";
+  const cells = Array.from({length:9},()=>({name:"", dps:0, buffs:0, anchor:false}));
+
+  if(result){
+    const topDps = Math.max(...team.map(c=>c.dps));
+    for(const p of result.placed){
+      const count = (result.buffSources[p.ch.name] || []).length;
+      for(const idx of p.cells){
+        cells[idx] = {
+          name:p.ch.name,
+          dps:p.ch.dps,
+          buffs:count,
+          anchor:idx === cellIndex(p.ar,p.ac),
+          top:p.ch.dps === topDps
+        };
+      }
+    }
+  }
+
+  cells.forEach((x,idx)=>{
+    const div = document.createElement("div");
+    div.className = "formation-cell" + (x.name ? " occupied":"") + (x.buffs ? " buff-hit":"") + (x.top ? " top-dps":"");
+    if(x.name){
+      div.innerHTML = `
+        ${x.buffs ? `<span class="buff-count">Buff×${x.buffs}</span>` : ""}
+        <div>
+          <div class="formation-name">${escapeHtml(x.name)}</div>
+          <div class="team-stats">DPS ${x.dps}</div>
+        </div>
+        <span class="formation-mini">${idx+1}</span>
+      `;
+    }else{
+      div.innerHTML = `<span class="formation-mini">${idx+1}</span>`;
+    }
+    grid.appendChild(div);
+  });
+
+  $("formationScore").textContent = result
+    ? `摆位评分：${result.score.toFixed(1)}（已穷举可行九宫格组合）`
+    : "没有找到可行摆位：可能是多格角色占位总量过大。";
+}
+
+function runSimulator(){
+  try{
+    const groups = getCandidateGroups();
+    const names = groups.flat();
+    const includeDisabled = $("teamIncludeDisabled").checked;
+
+    const missing = names.filter(n=>!characters.some(c=>c.name===n));
+    const disabled = names.filter(n=>characters.some(c=>c.name===n && !c.isEnable));
+
+    const target = {
+      dps:Math.max(0, Number($("simDps").value)||0),
+      heal:Math.max(0, Number($("simHeal").value)||0),
+      buff:Math.max(0, Number($("simBuff").value)||0),
+      np:Math.max(0, Number($("simNp").value)||0)
+    };
+    const modes = {
+      dps:$("modeDps").value,
+      heal:$("modeHeal").value,
+      buff:$("modeBuff").value,
+      np:$("modeNp").value
+    };
+    const priorities = {
+      dps:Math.max(1,Math.min(4,Math.round(Number($("priorityDps").value)||1))),
+      np:Math.max(1,Math.min(4,Math.round(Number($("priorityNp").value)||2))),
+      heal:Math.max(1,Math.min(4,Math.round(Number($("priorityHeal").value)||3))),
+      buff:Math.max(1,Math.min(4,Math.round(Number($("priorityBuff").value)||4)))
+    };
+    const size = 5;
+    $("simTeamSize").value = 5;
+
+    if(!groups.length) throw new Error("没有有效候选数组。");
+
+    const {team,preliminary,log} = chooseTeamByGroups(groups, size, target, modes, priorities, includeDisabled);
+    const avg = averageStats(team);
+    const sum = totalStats(team);
+
+    $("avgDps").textContent = `${avg.dps.toFixed(1)} 平均`;
+    $("avgHeal").textContent = `${avg.heal.toFixed(1)} 平均`;
+    $("avgBuff").textContent = `${avg.buff.toFixed(1)} 平均`;
+    $("avgNp").textContent = `${avg.np.toFixed(1)} 平均`;
+    $("sumDps").textContent = sum.dps.toFixed(0);
+    $("sumHeal").textContent = sum.heal.toFixed(0);
+    $("sumBuff").textContent = sum.buff.toFixed(0);
+    $("sumNp").textContent = sum.np.toFixed(0);
+
+    $("preliminaryList").innerHTML = "";
+    preliminary.forEach((c,i)=>{
+      const row = document.createElement("div");
+      row.className = "team-row";
+      row.innerHTML = `
+        <div class="team-rank">${i+1}</div>
+        <div>
+          <div class="team-name">${escapeHtml(c.name)}</div>
+          <div class="team-stats">DPS ${c.dps} · NP ${c.np} · Heal ${c.heal} · Buff ${c.buff}</div>
+        </div>
+        <div class="badge">预选</div>
+      `;
+      $("preliminaryList").appendChild(row);
+    });
+
+    $("teamList").innerHTML = "";
+    [...team].sort((a,b)=>b.dps-a.dps).forEach((c,i)=>{
+      const row = document.createElement("div");
+      row.className = "team-row";
+      row.innerHTML = `
+        <div class="team-rank">${i+1}</div>
+        <div>
+          <div class="team-name">${escapeHtml(c.name)}</div>
+          <div class="team-stats">DPS ${c.dps} · Heal ${c.heal} · Buff ${c.buff} · NP ${c.np}</div>
+        </div>
+        <div class="badge">${c.dps >= target.dps ? "DPS✓" : ""}</div>
+      `;
+      $("teamList").appendChild(row);
+    });
+
+    const tags = tagTotals(team);
+    const tagNames = {aoe:"群体 AOE",extra:"额外 Extra",dot:"持续 DOT",ret:"反击 RET"};
+    const bestVal = Math.max(...Object.values(tags));
+    const bestKeys = Object.keys(tags).filter(k=>tags[k]===bestVal);
+    $("tagResult").innerHTML =
+      Object.entries(tags).map(([k,v])=>
+        `<span class="tag-chip ${bestKeys.includes(k) ? "best-tag":""}">${tagNames[k]}：${v}</span>`
+      ).join("") +
+      `<div class="notice" style="margin-top:7px">推荐标签：${bestKeys.map(k=>tagNames[k]).join(" / ")}</div>`;
+
+    const formation = team.length === 5 ? buildPlacement(team) : null;
+    renderFormation(formation,team);
+    if(team.length < size){
+      $("formationScore").textContent = `尚未进入九宫格摆位：最终队伍只有 ${team.length}/5 人。`;
+    }
+
+    const lines = [...log];
+    if(missing.length) lines.push(`未找到角色：${missing.join("、")}`);
+    if(disabled.length && !includeDisabled) lines.push(`已忽略禁用角色：${disabled.join("、")}`);
+    lines.push(`最终平均：DPS ${avg.dps.toFixed(1)} / Heal ${avg.heal.toFixed(1)} / Buff ${avg.buff.toFixed(1)} / NP ${avg.np.toFixed(1)}`);
+    lines.push(`最终累加：DPS ${sum.dps.toFixed(0)} / Heal ${sum.heal.toFixed(0)} / Buff ${sum.buff.toFixed(0)} / NP ${sum.np.toFixed(0)}`);
+    lines.push(`阈值模式：DPS ${modes.dps==="sum"?"累加":"平均"} / NP ${modes.np==="sum"?"累加":"平均"} / Heal ${modes.heal==="sum"?"累加":"平均"} / Buff ${modes.buff==="sum"?"累加":"平均"}`);
+    lines.push(`属性优先级：DPS P${priorities.dps} / NP P${priorities.np} / Heal P${priorities.heal} / Buff P${priorities.buff}（DPS100硬优先；DPS85+主C优先；最终尽量保证2个DPS80+）`);
+    $("simLog").textContent = lines.join("\n");
+
+  }catch(err){
+    alert("模拟失败：\n" + err.message);
+  }
+}
+
+
+
+function formatCandidateGroups(groups){
+  if(!Array.isArray(groups)) return JSON.stringify(groups);
+  if(groups.every(x => typeof x === "string")){
+    return JSON.stringify(groups);
+  }
+  return "[\n" + groups.map(group => {
+    if(Array.isArray(group)){
+      return "  " + JSON.stringify(group);
+    }
+    return "  " + JSON.stringify(group);
+  }).join(",\n") + "\n]";
+}
+
+function shuffleArray(arr){
+  const a = [...arr];
+  for(let i=a.length-1;i>0;i--){
+    const j = Math.floor(Math.random()*(i+1));
+    [a[i],a[j]] = [a[j],a[i]];
+  }
+  return a;
+}
+
+function randomCandidateGroups(){
+  const groupCount = Math.max(1,Math.min(50,Math.round(Number($("randomGroupCount").value)||1)));
+  const groupSize = Math.max(1,Math.min(50,Math.round(Number($("randomGroupSize").value)||1)));
+  const includeDisabled = $("randomIncludeDisabled").checked;
+
+  const pool = characters
+    .filter(c=>includeDisabled || c.isEnable)
+    .map(c=>c.name);
+
+  if(!pool.length){
+    alert("当前 JSON 中没有可用于随机的角色。");
+    return;
+  }
+
+  const need = groupCount * groupSize;
+  if(need > pool.length){
+    alert(`无法生成：需要 ${need} 个不重复角色，但当前只有 ${pool.length} 个可用角色。\n请减少数组数量/每组人数，或允许随机禁用角色。`);
+    return;
+  }
+
+  const shuffled = shuffleArray(pool);
+  const groups = [];
+  for(let i=0;i<groupCount;i++){
+    groups.push(shuffled.slice(i*groupSize,(i+1)*groupSize));
+  }
+
+  $("candidateInput").value = formatCandidateGroups(groups);
+}
+
+function fillEnabledCandidates(){
+  const names = characters.filter(c=>c.isEnable).map(c=>c.name);
+  $("candidateInput").value = formatCandidateGroups([names]);
+}
+
+$("addBtn").onclick = addCharacter;
+$("deleteBtn").onclick = deleteCurrent;
+$("duplicateBtn").onclick = duplicateCurrent;
+$("saveBtn").onclick = syncFormToModel;
+$("exportBtn").onclick = exportAll;
+$("exportOneBtn").onclick = exportOne;
+$("clearBtn").onclick = clearAll;
+$("runSimBtn").onclick = runSimulator;
+$("fillEnabledBtn").onclick = fillEnabledCandidates;
+$("randomCandidatesBtn").onclick = randomCandidateGroups;
+$("searchInput").oninput = renderList;
+
+$("importFile").onchange = async e=>{
+  const file = e.target.files[0];
+  if(file) await importJson(file);
+  e.target.value = "";
+};
+
+[
+  "nameInput","enableInput","dpsInput","healInput","buffInput","npInput",
+  "aoeInput","extraInput","dotInput","retInput"
+].forEach(id=>{
+  $(id).addEventListener("input", syncFormToModel);
+  $(id).addEventListener("change", syncFormToModel);
+});
+
+loadStorage();
+renderList();
+
+if(characters.length){
+  selectedIndex = 0;
+  selectCharacter(0);
+}
+renderFormation(null, []);
+</script>
+</body>
+</html>
